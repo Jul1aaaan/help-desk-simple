@@ -1,0 +1,230 @@
+const express = require('express');
+const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const db = require('./db');
+
+const app = express();
+const PORT = 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Swagger Configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Help Desk API',
+      version: '1.0.0',
+      description: 'A simple Help Desk API for managing tickets',
+    },
+    servers: [
+      {
+        url: `http://localhost:${PORT}`,
+      },
+    ],
+  },
+  apis: ['./server.js'], // Files containing annotations
+};
+
+const swaggerDocs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+// --- Routes ---
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Ticket:
+ *       type: object
+ *       required:
+ *         - title
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: The auto-generated id of the ticket
+ *         title:
+ *           type: string
+ *           description: The title of the ticket
+ *         description:
+ *           type: string
+ *           description: The description of the ticket
+ *         status:
+ *           type: string
+ *           description: The status of the ticket
+ *           enum: [open, in-progress, closed]
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           description: The creation date
+ */
+
+/**
+ * @swagger
+ * /api/tickets:
+ *   get:
+ *     summary: Returns the list of all tickets
+ *     tags: [Tickets]
+ *     responses:
+ *       200:
+ *         description: The list of the tickets
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Ticket'
+ */
+app.get('/api/tickets', (req, res) => {
+  try {
+    const tickets = db.get('tickets').orderBy(['created_at'], ['desc']).value();
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/tickets:
+ *   post:
+ *     summary: Create a new ticket
+ *     tags: [Tickets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Ticket'
+ *     responses:
+ *       201:
+ *         description: The ticket was successfully created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Ticket'
+ */
+app.post('/api/tickets', (req, res) => {
+  try {
+    const { title, description } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const newTicket = {
+      id: Date.now(), // Simple ID generation
+      title,
+      description: description || '',
+      status: 'open',
+      created_at: new Date().toISOString()
+    };
+
+    db.get('tickets').push(newTicket).write();
+    res.status(201).json(newTicket);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/tickets/{id}:
+ *   put:
+ *     summary: Update a ticket status
+ *     tags: [Tickets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: The ticket id
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [open, in-progress, closed]
+ *     responses:
+ *       200:
+ *         description: The ticket was updated
+ *       404:
+ *         description: The ticket was not found
+ */
+app.put('/api/tickets/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    const validStatuses = ['open', 'in-progress', 'closed'];
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const ticket = db.get('tickets').find({ id: parseInt(id) }).value();
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    db.get('tickets')
+      .find({ id: parseInt(id) })
+      .assign({ status })
+      .write();
+
+    const updatedTicket = db.get('tickets').find({ id: parseInt(id) }).value();
+    res.json(updatedTicket);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/tickets/{id}:
+ *   delete:
+ *     summary: Remove the ticket by id
+ *     tags: [Tickets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: The ticket id
+ *     responses:
+ *       200:
+ *         description: The ticket was deleted
+ *       404:
+ *         description: The ticket was not found
+ */
+app.delete('/api/tickets/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const ticket = db.get('tickets').find({ id: parseInt(id) }).value();
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    db.get('tickets').remove({ id: parseInt(id) }).write();
+
+    res.json({ message: 'Ticket deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
+});

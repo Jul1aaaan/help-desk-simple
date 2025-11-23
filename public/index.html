@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Desk</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Help Desk</h1>
+            <p>Manage your support tickets efficiently.</p>
+        </header>
+
+        <main>
+            <section class="create-ticket">
+                <h2>Create New Ticket</h2>
+                <form id="ticketForm">
+                    <div class="form-group">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" name="title" placeholder="Brief summary of the issue" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" placeholder="Detailed description..." rows="4"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Ticket</button>
+                </form>
+            </section>
+
+            <section class="ticket-list">
+                <h2>Recent Tickets</h2>
+                <div id="ticketsContainer" class="tickets-grid">
+                    <!-- Tickets will be loaded here -->
+                    <div class="loading">Loading tickets...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
