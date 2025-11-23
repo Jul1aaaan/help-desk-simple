@@ -79,9 +79,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
  *               items:
  *                 $ref: '#/components/schemas/Ticket'
  */
-app.get('/api/tickets', (req, res) => {
+app.get('/api/tickets', async (req, res) => {
   try {
-    const tickets = db.get('tickets').orderBy(['created_at'], ['desc']).value();
+    const tickets = await db.getTickets();
+    // Sort by created_at desc
+    tickets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     res.json(tickets);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -108,7 +110,7 @@ app.get('/api/tickets', (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Ticket'
  */
-app.post('/api/tickets', (req, res) => {
+app.post('/api/tickets', async (req, res) => {
   try {
     const { title, description } = req.body;
     if (!title) {
@@ -123,7 +125,10 @@ app.post('/api/tickets', (req, res) => {
       created_at: new Date().toISOString()
     };
 
-    db.get('tickets').push(newTicket).write();
+    const tickets = await db.getTickets();
+    tickets.push(newTicket);
+    await db.saveTickets(tickets);
+
     res.status(201).json(newTicket);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -159,7 +164,7 @@ app.post('/api/tickets', (req, res) => {
  *       404:
  *         description: The ticket was not found
  */
-app.put('/api/tickets/:id', (req, res) => {
+app.put('/api/tickets/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -169,19 +174,17 @@ app.put('/api/tickets/:id', (req, res) => {
         return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const ticket = db.get('tickets').find({ id: parseInt(id) }).value();
+    const tickets = await db.getTickets();
+    const ticketIndex = tickets.findIndex(t => t.id === parseInt(id));
 
-    if (!ticket) {
+    if (ticketIndex === -1) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    db.get('tickets')
-      .find({ id: parseInt(id) })
-      .assign({ status })
-      .write();
+    tickets[ticketIndex].status = status;
+    await db.saveTickets(tickets);
 
-    const updatedTicket = db.get('tickets').find({ id: parseInt(id) }).value();
-    res.json(updatedTicket);
+    res.json(tickets[ticketIndex]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -206,17 +209,19 @@ app.put('/api/tickets/:id', (req, res) => {
  *       404:
  *         description: The ticket was not found
  */
-app.delete('/api/tickets/:id', (req, res) => {
+app.delete('/api/tickets/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const ticket = db.get('tickets').find({ id: parseInt(id) }).value();
+    let tickets = await db.getTickets();
+    const ticketIndex = tickets.findIndex(t => t.id === parseInt(id));
     
-    if (!ticket) {
+    if (ticketIndex === -1) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    db.get('tickets').remove({ id: parseInt(id) }).write();
+    tickets = tickets.filter(t => t.id !== parseInt(id));
+    await db.saveTickets(tickets);
 
     res.json({ message: 'Ticket deleted successfully' });
   } catch (error) {

@@ -1,11 +1,31 @@
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
-const path = require('path');
+require('dotenv').config();
+const { createClient } = require('redis');
 
-const adapter = new FileSync(path.join(__dirname, 'db.json'));
-const db = low(adapter);
+const client = createClient({
+  url: process.env.REDIS_URL
+});
 
-// Set some defaults (required if your JSON file is empty)
-db.defaults({ tickets: [] }).write();
+client.on('error', (err) => console.log('Redis Client Error', err));
 
-module.exports = db;
+(async () => {
+  await client.connect();
+  console.log('Connected to Redis');
+})();
+
+// Helper functions to simulate the previous lowdb behavior (array of tickets)
+const DB_KEY = 'tickets';
+
+async function getTickets() {
+  const data = await client.get(DB_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+async function saveTickets(tickets) {
+  await client.set(DB_KEY, JSON.stringify(tickets));
+}
+
+module.exports = {
+  client,
+  getTickets,
+  saveTickets
+};
