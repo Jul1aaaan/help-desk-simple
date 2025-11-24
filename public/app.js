@@ -1,98 +1,112 @@
 const API_URL = '/api/tickets';
 
+// DOM Elements
+const ticketsGrid = document.getElementById('ticketsGrid');
+const addTicketBtn = document.getElementById('addTicketBtn');
+const ticketModal = document.getElementById('ticketModal');
+const closeModalBtn = document.getElementById('closeModal');
+const cancelBtn = document.getElementById('cancelBtn');
+const createTicketForm = document.getElementById('createTicketForm');
+const filterTabs = document.querySelectorAll('.tab');
+const modalTitle = document.querySelector('.modal-header h3');
+const submitBtn = createTicketForm.querySelector('button[type="submit"]');
+
+// State
+let allTickets = [];
+let currentFilter = 'all';
+let isEditing = false;
+let editingId = null;
+
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     fetchTickets();
-
-    const form = document.getElementById('ticketForm');
-    form.addEventListener('submit', handleCreateTicket);
+    setupEventListeners();
 });
 
+function setupEventListeners() {
+    // Modal controls
+    addTicketBtn.addEventListener('click', () => openModal());
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    ticketModal.addEventListener('click', (e) => {
+        if (e.target === ticketModal) closeModal();
+    });
+
+    // Form submission
+    createTicketForm.addEventListener('submit', handleFormSubmit);
+
+    // Filters
+    filterTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            filterTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentFilter = tab.dataset.filter;
+            renderTickets();
+        });
+    });
+}
+
+// API Calls
 async function fetchTickets() {
-    const container = document.getElementById('ticketsContainer');
     try {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Failed to fetch tickets');
-        
-        const tickets = await response.json();
-        renderTickets(tickets);
+        allTickets = await response.json();
+        renderTickets();
     } catch (error) {
-        container.innerHTML = `<div class="error">Error loading tickets: ${error.message}</div>`;
+        console.error('Error:', error);
+        ticketsGrid.innerHTML = '<p class="error-msg">Failed to load tickets. Please try again.</p>';
     }
 }
 
-function renderTickets(tickets) {
-    const container = document.getElementById('ticketsContainer');
-    
-    if (tickets.length === 0) {
-        container.innerHTML = '<div class="empty">No tickets found. Create one above!</div>';
-        return;
-    }
-
-    container.innerHTML = tickets.map(ticket => `
-        <div class="ticket-card">
-            <div class="ticket-header">
-                <div class="ticket-title">${escapeHtml(ticket.title)}</div>
-                <span class="ticket-status status-${ticket.status.replace(' ', '-')}">${ticket.status}</span>
-            </div>
-            <div class="ticket-desc">${escapeHtml(ticket.description || 'No description')}</div>
-            <div class="ticket-footer">
-                <span>Created: ${new Date(ticket.created_at).toLocaleDateString()}</span>
-                <div class="ticket-actions">
-                    <select onchange="updateStatus(${ticket.id}, this.value)" class="btn-sm">
-                        <option value="open" ${ticket.status === 'open' ? 'selected' : ''}>Open</option>
-                        <option value="in-progress" ${ticket.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="closed" ${ticket.status === 'closed' ? 'selected' : ''}>Closed</option>
-                    </select>
-                    <button onclick="deleteTicket(${ticket.id})" class="btn-sm btn-delete">Delete</button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function handleCreateTicket(e) {
+async function handleFormSubmit(e) {
     e.preventDefault();
+    
     const title = document.getElementById('title').value;
     const description = document.getElementById('description').value;
-    const btn = e.target.querySelector('button');
+    const type = document.getElementById('type').value;
+    const area = document.getElementById('area').value;
     
+    // Loading state
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    submitBtn.disabled = true;
+
     try {
-        btn.disabled = true;
-        btn.textContent = 'Creating...';
+        let response;
+        if (isEditing) {
+            response = await fetch(`${API_URL}/${editingId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, type, area })
+            });
+        } else {
+            response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, type, area })
+            });
+        }
 
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description })
-        });
+        if (!response.ok) throw new Error('Failed to save ticket');
 
-        if (!response.ok) throw new Error('Failed to create ticket');
-
-        // Reset form and reload tickets
-        e.target.reset();
-        await fetchTickets();
-    } catch (error) {
-        alert('Error creating ticket: ' + error.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Ticket';
-    }
-}
-
-async function updateStatus(id, newStatus) {
-    try {
-        const response = await fetch(`${API_URL}/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-        });
-
-        if (!response.ok) throw new Error('Failed to update status');
+        const savedTicket = await response.json();
         
-        // Refresh to show updated state (or we could just update DOM)
-        await fetchTickets();
+        if (isEditing) {
+            const index = allTickets.findIndex(t => t.id === editingId);
+            if (index !== -1) allTickets[index] = savedTicket;
+        } else {
+            allTickets.unshift(savedTicket);
+        }
+
+        renderTickets();
+        closeModal();
     } catch (error) {
-        alert('Error updating status: ' + error.message);
+        console.error('Error:', error);
+        alert('Failed to save ticket');
+    } finally {
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
     }
 }
 
@@ -105,23 +119,126 @@ async function deleteTicket(id) {
         });
 
         if (!response.ok) throw new Error('Failed to delete ticket');
-        
-        await fetchTickets();
+
+        allTickets = allTickets.filter(t => t.id !== id);
+        renderTickets();
     } catch (error) {
-        alert('Error deleting ticket: ' + error.message);
+        console.error('Error:', error);
+        alert('Failed to delete ticket');
     }
+}
+
+// Rendering
+function renderTickets() {
+    ticketsGrid.innerHTML = '';
+
+    const filteredTickets = allTickets.filter(ticket => {
+        if (currentFilter === 'all') return true;
+        return ticket.status === currentFilter;
+    });
+
+    if (filteredTickets.length === 0) {
+        ticketsGrid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 2rem;">
+                <i class="fa-regular fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                <p>No tickets found.</p>
+            </div>
+        `;
+        return;
+    }
+
+    filteredTickets.forEach(ticket => {
+        const card = createTicketCard(ticket);
+        ticketsGrid.appendChild(card);
+    });
+}
+
+function createTicketCard(ticket) {
+    const div = document.createElement('div');
+    div.className = 'ticket-card';
+    
+    const date = new Date(ticket.created_at).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    div.innerHTML = `
+        <div class="ticket-header">
+            <span class="ticket-id">#${ticket.id.toString().slice(-4)}</span>
+            <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+        </div>
+        <h3 class="ticket-title">${escapeHtml(ticket.title)}</h3>
+        
+        <div class="ticket-meta" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                <i class="fa-solid fa-tag"></i> ${escapeHtml(ticket.type || 'General')}
+            </span>
+            <span class="badge" style="background: rgba(167, 139, 250, 0.1); color: #a78bfa; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                <i class="fa-solid fa-building"></i> ${escapeHtml(ticket.area || 'General')}
+            </span>
+        </div>
+
+        <p class="ticket-desc">${escapeHtml(ticket.description || 'No description provided.')}</p>
+        <div class="ticket-footer">
+            <span class="ticket-date"><i class="fa-regular fa-clock"></i> ${date}</span>
+            <div class="actions">
+                <button class="edit-btn" onclick="openEditModal(${ticket.id})" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; margin-right: 10px;">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="delete-btn" onclick="deleteTicket(${ticket.id})">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    return div;
+}
+
+// Helpers
+function openModal(ticketId = null) {
+    ticketModal.classList.add('active');
+    
+    if (ticketId) {
+        // Edit Mode
+        isEditing = true;
+        editingId = ticketId;
+        modalTitle.textContent = 'Edit Ticket';
+        submitBtn.textContent = 'Update Ticket';
+        
+        const ticket = allTickets.find(t => t.id === ticketId);
+        if (ticket) {
+            document.getElementById('title').value = ticket.title;
+            document.getElementById('description').value = ticket.description || '';
+            document.getElementById('type').value = ticket.type || 'General Inquiry';
+            document.getElementById('area').value = ticket.area || 'IT Support';
+        }
+    } else {
+        // Create Mode
+        isEditing = false;
+        editingId = null;
+        modalTitle.textContent = 'Create New Ticket';
+        submitBtn.textContent = 'Submit Ticket';
+        createTicketForm.reset();
+    }
+}
+
+function openEditModal(id) {
+    openModal(id);
+}
+
+function closeModal() {
+    ticketModal.classList.remove('active');
+    createTicketForm.reset();
+    isEditing = false;
+    editingId = null;
 }
 
 function escapeHtml(text) {
     if (!text) return '';
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
-// Expose functions to window for onclick handlers
-window.updateStatus = updateStatus;
+// Expose functions to global scope
 window.deleteTicket = deleteTicket;
+window.openEditModal = openEditModal;

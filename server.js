@@ -112,7 +112,7 @@ app.get('/api/tickets', async (req, res) => {
  */
 app.post('/api/tickets', async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, type, area } = req.body;
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
@@ -121,6 +121,8 @@ app.post('/api/tickets', async (req, res) => {
       id: Date.now(), // Simple ID generation
       title,
       description: description || '',
+      type: type || 'General Inquiry',
+      area: area || 'IT Support',
       status: 'open',
       created_at: new Date().toISOString()
     };
@@ -139,7 +141,7 @@ app.post('/api/tickets', async (req, res) => {
  * @swagger
  * /api/tickets/{id}:
  *   put:
- *     summary: Update a ticket status
+ *     summary: Update a ticket
  *     tags: [Tickets]
  *     parameters:
  *       - in: path
@@ -155,6 +157,14 @@ app.post('/api/tickets', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               area:
+ *                 type: string
  *               status:
  *                 type: string
  *                 enum: [open, in-progress, closed]
@@ -167,13 +177,8 @@ app.post('/api/tickets', async (req, res) => {
 app.put('/api/tickets/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { title, description, type, area, status } = req.body;
     
-    const validStatuses = ['open', 'in-progress', 'closed'];
-    if (!validStatuses.includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
-    }
-
     const tickets = await db.getTickets();
     const ticketIndex = tickets.findIndex(t => t.id === parseInt(id));
 
@@ -181,7 +186,18 @@ app.put('/api/tickets/:id', async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    tickets[ticketIndex].status = status;
+    // Update fields if provided
+    if (title !== undefined) tickets[ticketIndex].title = title;
+    if (description !== undefined) tickets[ticketIndex].description = description;
+    if (type !== undefined) tickets[ticketIndex].type = type;
+    if (area !== undefined) tickets[ticketIndex].area = area;
+    if (status !== undefined) {
+        const validStatuses = ['open', 'in-progress', 'closed'];
+        if (validStatuses.includes(status)) {
+            tickets[ticketIndex].status = status;
+        }
+    }
+
     await db.saveTickets(tickets);
 
     res.json(tickets[ticketIndex]);

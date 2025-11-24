@@ -3,43 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Help Desk</title>
+    <title>Help Desk | Support Center</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Help Desk</h1>
-            <p>Manage your support tickets efficiently.</p>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container">
+        <header class="glass-header">
+            <div class="logo">
+                <img src="logo.png" alt="HelpDesk Logo" style="height: 40px; width: auto;">
+                <span>HelpDesk</span>
+            </div>
+            <button id="addTicketBtn" class="btn-primary">
+                <i class="fa-solid fa-plus"></i> New Ticket
+            </button>
         </header>
 
         <main>
-            <section class="create-ticket">
-                <h2>Create New Ticket</h2>
-                <form id="ticketForm">
-                    <div class="form-group">
-                        <label for="title">Title</label>
-                        <input type="text" id="title" name="title" placeholder="Brief summary of the issue" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea id="description" name="description" placeholder="Detailed description..." rows="4"></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary">Create Ticket</button>
-                </form>
+            <section class="hero">
+                <h1>Support Center</h1>
+                <p>Track and manage your support requests in real-time.</p>
             </section>
 
-            <section class="ticket-list">
-                <h2>Recent Tickets</h2>
-                <div id="ticketsContainer" class="tickets-grid">
-                    <!-- Tickets will be loaded here -->
-                    <div class="loading">Loading tickets...</div>
+            <section class="tickets-section">
+                <div class="tickets-header">
+                    <h2>Active Tickets</h2>
+                    <div class="filter-tabs">
+                        <button class="tab active" data-filter="all">All</button>
+                        <button class="tab" data-filter="open">Open</button>
+                        <button class="tab" data-filter="in-progress">In Progress</button>
+                        <button class="tab" data-filter="closed">Closed</button>
+                    </div>
+                </div>
+                
+                <div id="ticketsGrid" class="tickets-grid">
+                    <!-- Tickets will be injected here -->
+                    <div class="loading-spinner">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Modal for New Ticket -->
+    <div id="ticketModal" class="modal-overlay">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h3>Create New Ticket</h3>
+                <button id="closeModal" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="createTicketForm">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" placeholder="What's the issue?" required>
+                </div>
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="type">Requirement Type</label>
+                        <select id="type" name="type" required>
+                            <option value="Bug Report">Bug Report</option>
+                            <option value="Feature Request">Feature Request</option>
+                            <option value="Technical Support">Technical Support</option>
+                            <option value="Access/Permissions">Access/Permissions</option>
+                            <option value="General Inquiry">General Inquiry</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="area">Assigned Area</label>
+                        <select id="area" name="area" required>
+                            <option value="IT Support">IT Support</option>
+                            <option value="Human Resources">Human Resources</option>
+                            <option value="Sales & Marketing">Sales & Marketing</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Operations">Operations</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" placeholder="Describe the details..." rows="4"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn-primary">Submit Ticket</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="app.js"></script>
